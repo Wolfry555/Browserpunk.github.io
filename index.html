@@ -1,0 +1,896 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>CYBERPUNK 2077: RELIC DUNGEON</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            user-select: none;
+            -webkit-user-select: none;
+            touch-action: none;
+        }
+        body, html {
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background-color: #050508;
+            font-family: 'Courier New', Courier, monospace;
+            color: #00f0ff;
+        }
+        #game-container {
+            position: relative;
+            width: 100vw;
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background: #020204;
+        }
+        canvas {
+            display: block;
+            box-shadow: 0 0 20px rgba(0, 240, 255, 0.2);
+            background: #08080c;
+        }
+        /* Mobile Touch Overlay */
+        .touch-ui {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            display: none;
+            z-index: 10;
+        }
+        .touch-active .touch-ui {
+            display: block;
+        }
+        #joystick-zone {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            width: 140px;
+            height: 140px;
+            background: rgba(0, 240, 255, 0.1);
+            border: 2px solid rgba(0, 240, 255, 0.4);
+            border-radius: 50%;
+            pointer-events: auto;
+        }
+        #joystick-stick {
+            position: absolute;
+            top: 40px;
+            left: 40px;
+            width: 60px;
+            height: 60px;
+            background: #00f0ff;
+            border-radius: 50%;
+            box-shadow: 0 0 10px #00f0ff;
+        }
+        .touch-buttons {
+            position: absolute;
+            bottom: 20px;
+            right: 20px;
+            display: grid;
+            grid-template-columns: repeat(3, 60px);
+            gap: 10px;
+            pointer-events: auto;
+        }
+        .t-btn {
+            width: 60px;
+            height: 60px;
+            background: rgba(255, 0, 85, 0.2);
+            border: 2px solid #ff0055;
+            color: #fff;
+            font-weight: bold;
+            font-size: 12px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 0 8px rgba(255, 0, 85, 0.4);
+        }
+        .t-btn:active {
+            background: rgba(255, 0, 85, 0.6);
+            transform: scale(0.95);
+        }
+        /* UI Overlays */
+        .dialogue-overlay, .modal-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(5, 5, 10, 0.85);
+            display: flex;
+            flex-direction: column;
+            justify-content: flex-end;
+            align-items: center;
+            padding: 20px;
+            z-index: 20;
+        }
+        .dialogue-box {
+            width: 100%;
+            max-width: 700px;
+            background: #0c0d14;
+            border: 2px solid #ff0055;
+            box-shadow: 0 0 15px rgba(255, 0, 85, 0.3);
+            padding: 20px;
+            margin-bottom: 20px;
+            position: relative;
+        }
+        .dialogue-portrait {
+            color: #ffe600;
+            font-size: 18px;
+            font-weight: bold;
+            margin-bottom: 8px;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+        }
+        .dialogue-text {
+            color: #e0e0e0;
+            font-size: 15px;
+            line-height: 1.5;
+            min-height: 50px;
+        }
+        .dialogue-btn {
+            align-self: flex-end;
+            margin-top: 10px;
+            background: #ff0055;
+            color: #fff;
+            border: none;
+            padding: 10px 20px;
+            font-family: inherit;
+            font-weight: bold;
+            cursor: pointer;
+            box-shadow: 0 0 10px #ff0055;
+        }
+        .modal-card {
+            background: #0c0d14;
+            border: 2px solid #00f0ff;
+            padding: 25px;
+            width: 90%;
+            max-width: 500px;
+            text-align: center;
+            box-shadow: 0 0 20px rgba(0, 240, 255, 0.3);
+            margin: auto;
+        }
+        .modal-title {
+            font-size: 24px;
+            color: #ffe600;
+            margin-bottom: 15px;
+            text-shadow: 0 0 8px #ffe600;
+        }
+        .start-btn {
+            background: #00f0ff;
+            color: #000;
+            font-size: 18px;
+            font-weight: bold;
+            padding: 12px 30px;
+            border: none;
+            cursor: pointer;
+            margin-top: 15px;
+            box-shadow: 0 0 12px #00f0ff;
+        }
+    </style>
+</head>
+<body>
+    <div id="game-container">
+        <canvas id="gameCanvas"></canvas>
+
+        <!-- Touch Controls -->
+        <div class="touch-ui" id="touchUi">
+            <div id="joystick-zone"><div id="joystick-stick"></div></div>
+            <div class="touch-buttons">
+                <div class="t-btn" id="tb-hack1">1:EMP</div>
+                <div class="t-btn" id="tb-hack2">2:PSY</div>
+                <div class="t-btn" id="tb-hack3">3:PING</div>
+                <div class="t-btn" id="tb-hack4">4:SAND</div>
+                <div class="t-btn" id="tb-heal" style="border-color:#00ff66;">DOC[E]</div>
+                <div class="t-btn" id="tb-fire" style="border-color:#ffe600; background:rgba(255,230,0,0.2);">FIRE</div>
+            </div>
+        </div>
+
+        <!-- Dialogue UI -->
+        <div class="dialogue-overlay" id="dialogueOverlay" style="display: none;">
+            <div class="dialogue-box">
+                <div class="dialogue-portrait" id="dialogueSpeaker">JOHNNY SILVERHAND</div>
+                <div class="dialogue-text" id="dialogueText">...</div>
+                <button class="dialogue-btn" id="dialogueNextBtn">ПРОДОЛЖИТЬ [SPACE]</button>
+            </div>
+        </div>
+
+        <!-- Start/Death Overlay -->
+        <div class="modal-overlay" id="menuOverlay">
+            <div class="modal-card">
+                <div class="modal-title" id="menuTitle">CYBERPUNK 2077</div>
+                <p style="margin-bottom: 15px; color: #aaa; font-size: 13px;" id="menuDesc">
+                    ПРОНИКНИТЕ В АРАСАКА-ТАУЭР, ИСПОЛЬЗУЙТЕ КВИКХАКИ И САНДЕВИСТАН, ЧТОБЫ ВЫЖИТЬ.
+                </p>
+                <button class="start-btn" id="startBtn">ПОДКЛЮЧИТЬСЯ к RELIC</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- Web Audio API Synth Engine ---
+        class SoundEngine {
+            constructor() {
+                this.ctx = null;
+            }
+            init() {
+                if (!this.ctx) {
+                    this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+                }
+            }
+            playTone(freq, type, duration, vol = 0.1) {
+                if (!this.ctx) return;
+                try {
+                    const osc = this.ctx.createOscillator();
+                    const gain = this.ctx.createGain();
+                    osc.type = type;
+                    osc.frequency.setValueAtTime(freq, this.ctx.currentTime);
+                    gain.gain.setValueAtTime(vol, this.ctx.currentTime);
+                    gain.gain.exponentialRampToValueAtTime(0.0001, this.ctx.currentTime + duration);
+                    osc.connect(gain);
+                    gain.connect(this.ctx.destination);
+                    osc.start();
+                    osc.stop(this.ctx.currentTime + duration);
+                } catch(e) {}
+            }
+            shoot() { this.playTone(600, 'square', 0.08, 0.08); }
+            hit() { this.playTone(120, 'sawtooth', 0.15, 0.15); }
+            hack() { this.playTone(880, 'sine', 0.25, 0.12); }
+            heal() { this.playTone(440, 'triangle', 0.3, 0.15); }
+            sandy() { this.playTone(200, 'sawtooth', 0.5, 0.2); }
+        }
+        const audio = new SoundEngine();
+
+        // --- Game Setup & State ---
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        ctx.imageSmoothingEnabled = false;
+
+        const TILE_SIZE = 32;
+        const MAP_WIDTH = 28;
+        const MAP_HEIGHT = 20;
+
+        let gameState = 'MENU'; // MENU, DIALOGUE, PLAYING, GAMEOVER
+        let map = [];
+        let fog = [];
+        let particles = [];
+        let bullets = [];
+        let enemies = [];
+        let items = [];
+        let currentLevel = 1;
+
+        // Player Data
+        const player = {
+            x: 0,
+            y: 0,
+            radius: 10,
+            speed: 3.2,
+            hp: 100,
+            maxHp: 100,
+            shield: 50,
+            maxShield: 50,
+            eddies: 0,
+            maxDoc: 2,
+            ram: 10,
+            maxRam: 10,
+            sandyActive: false,
+            sandyTimer: 0,
+            sandyCd: 0,
+            pingActive: false,
+            pingTimer: 0
+        };
+
+        // Inputs
+        const keys = {};
+        let mousePos = { x: 0, y: 0 };
+        let isTouchDevice = false;
+        let joyVector = { x: 0, y: 0 };
+
+        // Dialogues Story Line
+        const storyDialogues = [
+            {
+                speaker: "JOHNNY SILVERHAND",
+                text: "Проснись уже, Самурай! Мы в серверной Арасаки. Релик нестабилен, так что поторопись."
+            },
+            {
+                speaker: "V",
+                text: "Голова раскалывается, Джонни... Системы безопасности уже взломали периметр?"
+            },
+            {
+                speaker: "JOHNNY SILVERHAND",
+                text: "Они повсюду. Используй квикхаки на [1-4] и Сандевистан, если зажмут в угол. Зажги этот чертов комплекс!"
+            }
+        ];
+        let currentDialogueIdx = 0;
+
+        // Map Generator & Safe Spawn
+        function generateMap() {
+            map = [];
+            fog = [];
+            for (let r = 0; r < MAP_HEIGHT; r++) {
+                map[r] = [];
+                fog[r] = [];
+                for (let c = 0; c < MAP_WIDTH; c++) {
+                    // Outer walls
+                    if (r === 0 || r === MAP_HEIGHT - 1 || c === 0 || c === MAP_WIDTH - 1) {
+                        map[r][c] = 1; 
+                    } else {
+                        // Random internal obstacle blocks
+                        map[r][c] = (Math.random() < 0.18) ? 1 : 0;
+                    }
+                    fog[r][c] = true;
+                }
+            }
+
+            // Clear center starting zone guarantees no initial collision traps
+            const startC = Math.floor(MAP_WIDTH / 2);
+            const startR = Math.floor(MAP_HEIGHT / 2);
+
+            for (let dr = -2; dr <= 2; dr++) {
+                for (let dc = -2; dc <= 2; dc++) {
+                    const nr = startR + dr;
+                    const nc = startC + dc;
+                    if (nr > 0 && nr < MAP_HEIGHT - 1 && nc > 0 && nc < MAP_WIDTH - 1) {
+                        map[nr][nc] = 0;
+                    }
+                }
+            }
+
+            // Set player safe position in screen/world coordinate center
+            player.x = startC * TILE_SIZE + TILE_SIZE / 2;
+            player.y = startR * TILE_SIZE + TILE_SIZE / 2;
+
+            // Exit Elevator Spawn
+            map[2][MAP_WIDTH - 3] = 2; // Exit tile
+            map[2][MAP_WIDTH - 2] = 0;
+            map[3][MAP_WIDTH - 3] = 0;
+
+            // Spawn Enemies
+            enemies = [];
+            const enemyCount = 4 + currentLevel * 2;
+            for (let i = 0; i < enemyCount; i++) {
+                let rx, ry;
+                do {
+                    rx = Math.floor(Math.random() * (MAP_WIDTH - 4)) + 2;
+                    ry = Math.floor(Math.random() * (MAP_HEIGHT - 4)) + 2;
+                } while (map[ry][rx] !== 0 || Math.hypot(rx * TILE_SIZE - player.x, ry * TILE_SIZE - player.y) < 150);
+
+                enemies.push({
+                    x: rx * TILE_SIZE + 16,
+                    y: ry * TILE_SIZE + 16,
+                    radius: 11,
+                    hp: 40 + currentLevel * 15,
+                    maxHp: 40 + currentLevel * 15,
+                    type: Math.random() > 0.4 ? 'DRONE' : 'MECH',
+                    speed: 1.2 + Math.random() * 0.8,
+                    cooldown: 0,
+                    psychosis: false,
+                    psychosisTimer: 0
+                });
+            }
+        }
+
+        // --- Resize & Init ---
+        function resizeCanvas() {
+            canvas.width = Math.min(window.innerWidth, 896);
+            canvas.height = Math.min(window.innerHeight, 640);
+            ctx.imageSmoothingEnabled = false;
+        }
+        window.addEventListener('resize', resizeCanvas);
+        resizeCanvas();
+
+        // --- Controls Handling ---
+        window.addEventListener('keydown', (e) => {
+            keys[e.code] = true;
+            if (gameState === 'DIALOGUE' && (e.code === 'Space' || e.code === 'Enter')) {
+                nextDialogueStep();
+            }
+            if (gameState === 'PLAYING') {
+                if (e.code === 'Digit1') triggerQuickhack(1);
+                if (e.code === 'Digit2') triggerQuickhack(2);
+                if (e.code === 'Digit3') triggerQuickhack(3);
+                if (e.code === 'Digit4') triggerQuickhack(4);
+                if (e.code === 'KeyE') useMaxDoc();
+            }
+        });
+        window.addEventListener('keyup', (e) => { keys[e.code] = false; });
+
+        canvas.addEventListener('mousemove', (e) => {
+            const rect = canvas.getBoundingClientRect();
+            mousePos.x = e.clientX - rect.left;
+            mousePos.y = e.clientY - rect.top;
+        });
+
+        canvas.addEventListener('mousedown', (e) => {
+            audio.init();
+            if (gameState === 'PLAYING' && e.button === 0) {
+                shootBullet(mousePos.x, mousePos.y);
+            }
+        });
+
+        // Touch Control Listeners
+        const joystickZone = document.getElementById('joystick-zone');
+        const joystickStick = document.getElementById('joystick-stick');
+
+        let joyTouchId = null;
+        const joyCenter = { x: 70, y: 70 };
+
+        window.addEventListener('touchstart', (e) => {
+            audio.init();
+            if (!isTouchDevice) {
+                isTouchDevice = true;
+                document.body.classList.add('touch-active');
+            }
+            for (let i = 0; i < e.changedTouches.length; i++) {
+                const t = e.changedTouches[i];
+                const rect = joystickZone.getBoundingClientRect();
+                if (t.clientX >= rect.left && t.clientX <= rect.right &&
+                    t.clientY >= rect.top && t.clientY <= rect.bottom && joyTouchId === null) {
+                    joyTouchId = t.identifier;
+                    updateJoystick(t.clientX - rect.left, t.clientY - rect.top);
+                }
+            }
+        });
+
+        window.addEventListener('touchmove', (e) => {
+            for (let i = 0; i < e.changedTouches.length; i++) {
+                const t = e.changedTouches[i];
+                if (t.identifier === joyTouchId) {
+                    const rect = joystickZone.getBoundingClientRect();
+                    updateJoystick(t.clientX - rect.left, t.clientY - rect.top);
+                }
+            }
+        });
+
+        const resetJoy = () => {
+            joyTouchId = null;
+            joyVector = { x: 0, y: 0 };
+            joystickStick.style.left = '40px';
+            joystickStick.style.top = '40px';
+        };
+        window.addEventListener('touchend', (e) => {
+            for (let i = 0; i < e.changedTouches.length; i++) {
+                if (e.changedTouches[i].identifier === joyTouchId) resetJoy();
+            }
+        });
+        window.addEventListener('touchcancel', resetJoy);
+
+        function updateJoystick(tx, ty) {
+            const dx = tx - joyCenter.x;
+            const dy = ty - joyCenter.y;
+            const dist = Math.hypot(dx, dy);
+            const maxR = 40;
+            const angle = Math.atan2(dy, dx);
+            const clampedDist = Math.min(dist, maxR);
+            
+            joyVector.x = (clampedDist / maxR) * Math.cos(angle);
+            joyVector.y = (clampedDist / maxR) * Math.sin(angle);
+
+            joystickStick.style.left = `${40 + joyVector.x * maxR}px`;
+            joystickStick.style.top = `${40 + joyVector.y * maxR}px`;
+        }
+
+        // Attach Touch Action Buttons
+        document.getElementById('tb-fire').addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            if (gameState === 'PLAYING') autoTargetShoot();
+        });
+        document.getElementById('tb-hack1').addEventListener('touchstart', (e) => { e.preventDefault(); triggerQuickhack(1); });
+        document.getElementById('tb-hack2').addEventListener('touchstart', (e) => { e.preventDefault(); triggerQuickhack(2); });
+        document.getElementById('tb-hack3').addEventListener('touchstart', (e) => { e.preventDefault(); triggerQuickhack(3); });
+        document.getElementById('tb-hack4').addEventListener('touchstart', (e) => { e.preventDefault(); triggerQuickhack(4); });
+        document.getElementById('tb-heal').addEventListener('touchstart', (e) => { e.preventDefault(); useMaxDoc(); });
+
+        // --- Gameplay Mechanics ---
+        function shootBullet(tx, ty) {
+            const angle = Math.atan2(ty - player.y, tx - player.x);
+            bullets.push({
+                x: player.x,
+                y: player.y,
+                vx: Math.cos(angle) * 8,
+                vy: Math.sin(angle) * 8,
+                isEnemy: false
+            });
+            audio.shoot();
+        }
+
+        function autoTargetShoot() {
+            let closest = null;
+            let minDist = Infinity;
+            enemies.forEach(e => {
+                const d = Math.hypot(e.x - player.x, e.y - player.y);
+                if (d < minDist) { minDist = d; closest = e; }
+            });
+            if (closest) shootBullet(closest.x, closest.y);
+            else shootBullet(player.x + 100, player.y);
+        }
+
+        function triggerQuickhack(type) {
+            if (player.ram < 3) return;
+            player.ram -= 3;
+            audio.hack();
+
+            if (type === 1) { // Short Circuit
+                enemies.forEach(e => {
+                    if (Math.hypot(e.x - player.x, e.y - player.y) < 180) {
+                        e.hp -= 35;
+                        spawnParticles(e.x, e.y, '#00f0ff', 8);
+                    }
+                });
+            } else if (type === 2) { // Cyberpsychosis
+                enemies.forEach(e => {
+                    if (Math.hypot(e.x - player.x, e.y - player.y) < 150) {
+                        e.psychosis = true;
+                        e.psychosisTimer = 240;
+                    }
+                });
+            } else if (type === 3) { // Ping
+                player.pingActive = true;
+                player.pingTimer = 300;
+            } else if (type === 4) { // Sandevistan
+                if (player.sandyCd <= 0) {
+                    player.sandyActive = true;
+                    player.sandyTimer = 180;
+                    player.sandyCd = 400;
+                    audio.sandy();
+                }
+            }
+        }
+
+        function useMaxDoc() {
+            if (player.maxDoc > 0 && player.hp < player.maxHp) {
+                player.maxDoc--;
+                player.hp = Math.min(player.maxHp, player.hp + 45);
+                audio.heal();
+                spawnParticles(player.x, player.y, '#00ff66', 12);
+            }
+        }
+
+        function spawnParticles(x, y, color, count) {
+            for (let i = 0; i < count; i++) {
+                particles.push({
+                    x, y,
+                    vx: (Math.random() - 0.5) * 4,
+                    vy: (Math.random() - 0.5) * 4,
+                    color,
+                    life: 20 + Math.random() * 15
+                });
+            }
+        }
+
+        // Check AABB Tile Wall Collision & Pushout
+        function checkWallCollision(newX, newY) {
+            const rad = player.radius;
+            const minC = Math.floor((newX - rad) / TILE_SIZE);
+            const maxC = Math.floor((newX + rad) / TILE_SIZE);
+            const minR = Math.floor((newY - rad) / TILE_SIZE);
+            const maxR = Math.floor((newY + rad) / TILE_SIZE);
+
+            for (let r = minR; r <= maxR; r++) {
+                for (let c = minC; c <= maxC; c++) {
+                    if (r >= 0 && r < MAP_HEIGHT && c >= 0 && c < MAP_WIDTH) {
+                        if (map[r][c] === 1) return true;
+                    }
+                }
+            }
+            return false;
+        }
+
+        // Update Game Loop
+        function update() {
+            if (gameState !== 'PLAYING') return;
+
+            // Sandevistan Timers
+            let timeScale = 1.0;
+            if (player.sandyActive) {
+                timeScale = 0.3;
+                player.sandyTimer--;
+                if (player.sandyTimer <= 0) player.sandyActive = false;
+            }
+            if (player.sandyCd > 0) player.sandyCd--;
+            if (player.pingTimer > 0) {
+                player.pingTimer--;
+                if (player.pingTimer <= 0) player.pingActive = false;
+            }
+
+            // RAM Auto-Regen
+            if (player.ram < player.maxRam) player.ram += 0.02;
+
+            // Player Movement Vectors
+            let moveX = 0;
+            let moveY = 0;
+
+            if (keys['KeyW'] || keys['ArrowUp']) moveY -= 1;
+            if (keys['KeyS'] || keys['ArrowDown']) moveY += 1;
+            if (keys['KeyA'] || keys['ArrowLeft']) moveX -= 1;
+            if (keys['KeyD'] || keys['ArrowRight']) moveX += 1;
+
+            if (joyVector.x !== 0 || joyVector.y !== 0) {
+                moveX = joyVector.x;
+                moveY = joyVector.y;
+            } else if (moveX !== 0 && moveY !== 0) {
+                moveX *= 0.7071;
+                moveY *= 0.7071;
+            }
+
+            const nextX = player.x + moveX * player.speed;
+            const nextY = player.y + moveY * player.speed;
+
+            if (!checkWallCollision(nextX, player.y)) player.x = nextX;
+            if (!checkWallCollision(player.x, nextY)) player.y = nextY;
+
+            // Update Fog of War
+            const pr = Math.floor(player.y / TILE_SIZE);
+            const pc = Math.floor(player.x / TILE_SIZE);
+            const viewDist = 4;
+            for (let r = Math.max(0, pr - viewDist); r <= Math.min(MAP_HEIGHT - 1, pr + viewDist); r++) {
+                for (let c = Math.max(0, pc - viewDist); c <= Math.min(MAP_WIDTH - 1, pc + viewDist); c++) {
+                    fog[r][c] = false;
+                }
+            }
+
+            // Check Elevator Next Level Trigger
+            if (map[pr] && map[pr][pc] === 2) {
+                currentLevel++;
+                generateMap();
+                return;
+            }
+
+            // Update Bullets
+            bullets.forEach((b, i) => {
+                b.x += b.vx * (b.isEnemy ? timeScale : 1.0);
+                b.y += b.vy * (b.isEnemy ? timeScale : 1.0);
+
+                // Tile collision
+                const br = Math.floor(b.y / TILE_SIZE);
+                const bc = Math.floor(b.x / TILE_SIZE);
+                if (map[br] && map[br][bc] === 1) {
+                    bullets.splice(i, 1);
+                    return;
+                }
+
+                // Hit Player
+                if (b.isEnemy) {
+                    if (Math.hypot(b.x - player.x, b.y - player.y) < player.radius) {
+                        if (player.shield > 0) player.shield = Math.max(0, player.shield - 12);
+                        else player.hp -= 12;
+                        audio.hit();
+                        bullets.splice(i, 1);
+                        if (player.hp <= 0) triggerGameOver();
+                    }
+                } else {
+                    // Hit Enemies
+                    enemies.forEach((e) => {
+                        if (Math.hypot(b.x - e.x, b.y - e.y) < e.radius) {
+                            e.hp -= 25;
+                            spawnParticles(e.x, e.y, '#ff0055', 4);
+                            bullets.splice(i, 1);
+                        }
+                    });
+                }
+            });
+
+            // Update Enemies AI
+            enemies.forEach((e, idx) => {
+                if (e.psychosis) {
+                    e.psychosisTimer--;
+                    if (e.psychosisTimer <= 0) e.psychosis = false;
+                }
+
+                const target = e.psychosis ? (enemies[idx === 0 ? 1 : 0] || player) : player;
+                const angle = Math.atan2(target.y - e.y, target.x - e.x);
+
+                const ex = e.x + Math.cos(angle) * e.speed * timeScale;
+                const ey = e.y + Math.sin(angle) * e.speed * timeScale;
+
+                if (!checkWallCollision(ex, ey)) {
+                    e.x = ex;
+                    e.y = ey;
+                }
+
+                // Enemy Shooting
+                e.cooldown += timeScale;
+                if (e.cooldown > 90) {
+                    e.cooldown = 0;
+                    if (Math.hypot(player.x - e.x, player.y - e.y) < 220) {
+                        bullets.push({
+                            x: e.x, y: e.y,
+                            vx: Math.cos(angle) * 4,
+                            vy: Math.sin(angle) * 4,
+                            isEnemy: true
+                        });
+                    }
+                }
+            });
+
+            // Filter Dead Enemies & Drop Eddies
+            enemies = enemies.filter(e => {
+                if (e.hp <= 0) {
+                    player.eddies += 150;
+                    spawnParticles(e.x, e.y, '#ffe600', 10);
+                    return false;
+                }
+                return true;
+            });
+
+            // Update Particles
+            particles.forEach((p, i) => {
+                p.x += p.vx;
+                p.y += p.vy;
+                p.life--;
+                if (p.life <= 0) particles.splice(i, 1);
+            });
+        }
+
+        // --- Render Engine ---
+        function render() {
+            ctx.fillStyle = '#050508';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Render Dungeon Map
+            for (let r = 0; r < MAP_HEIGHT; r++) {
+                for (let c = 0; c < MAP_WIDTH; c++) {
+                    const x = c * TILE_SIZE;
+                    const y = r * TILE_SIZE;
+
+                    if (fog[r][c] && !player.pingActive) {
+                        ctx.fillStyle = '#020204';
+                        ctx.fillRect(x, y, TILE_SIZE, TILE_SIZE);
+                        continue;
+                    }
+
+                    if (map[r][c] === 1) { // Wall
+                        ctx.fillStyle = '#12131c';
+                        ctx.fillRect(x, y, TILE_SIZE, TILE_SIZE);
+                        ctx.strokeStyle = 'rgba(0, 240, 255, 0.2)';
+                        ctx.strokeRect(x, y, TILE_SIZE, TILE_SIZE);
+                    } else if (map[r][c] === 2) { // Elevator Exit
+                        ctx.fillStyle = '#00ff66';
+                        ctx.fillRect(x + 4, y + 4, TILE_SIZE - 8, TILE_SIZE - 8);
+                    } else { // Floor Grid
+                        ctx.fillStyle = '#090a10';
+                        ctx.fillRect(x, y, TILE_SIZE, TILE_SIZE);
+                        ctx.strokeStyle = '#0e101a';
+                        ctx.strokeRect(x, y, TILE_SIZE, TILE_SIZE);
+                    }
+                }
+            }
+
+            // Render Enemies
+            enemies.forEach(e => {
+                ctx.save();
+                ctx.translate(e.x, e.y);
+                ctx.fillStyle = e.psychosis ? '#ffe600' : '#ff0055';
+                ctx.beginPath();
+                ctx.arc(0, 0, e.radius, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.shadowColor = e.psychosis ? '#ffe600' : '#ff0055';
+                ctx.shadowBlur = 10;
+                ctx.restore();
+
+                // HP bar
+                ctx.fillStyle = 'rgba(0,0,0,0.5)';
+                ctx.fillRect(e.x - 12, e.y - 18, 24, 4);
+                ctx.fillStyle = '#ff0055';
+                ctx.fillRect(e.x - 12, e.y - 18, (e.hp / e.maxHp) * 24, 4);
+            });
+
+            // Render Player V
+            if (gameState === 'PLAYING' || gameState === 'DIALOGUE') {
+                ctx.save();
+                ctx.translate(player.x, player.y);
+                ctx.fillStyle = '#00f0ff';
+                ctx.beginPath();
+                ctx.arc(0, 0, player.radius, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.shadowColor = '#00f0ff';
+                ctx.shadowBlur = player.sandyActive ? 20 : 8;
+                ctx.restore();
+            }
+
+            // Bullets
+            bullets.forEach(b => {
+                ctx.fillStyle = b.isEnemy ? '#ff0055' : '#00f0ff';
+                ctx.beginPath();
+                ctx.arc(b.x, b.y, 3, 0, Math.PI * 2);
+                ctx.fill();
+            });
+
+            // Particles
+            particles.forEach(p => {
+                ctx.fillStyle = p.color;
+                ctx.fillRect(p.x, p.y, 2, 2);
+            });
+
+            // HUD overlay
+            if (gameState === 'PLAYING') {
+                ctx.fillStyle = '#ffe600';
+                ctx.font = 'bold 12px Courier New';
+                ctx.fillText(`ЭТАЖ: ${currentLevel} | €$: ${player.eddies}`, 15, 25);
+
+                // HP Bar
+                ctx.fillStyle = 'rgba(255,255,255,0.1)';
+                ctx.fillRect(15, 35, 120, 8);
+                ctx.fillStyle = '#00ff66';
+                ctx.fillRect(15, 35, (player.hp / player.maxHp) * 120, 8);
+
+                // Shield Bar
+                ctx.fillStyle = 'rgba(255,255,255,0.1)';
+                ctx.fillRect(15, 47, 120, 6);
+                ctx.fillStyle = '#00f0ff';
+                ctx.fillRect(15, 47, (player.shield / player.maxShield) * 120, 6);
+
+                // RAM Bar
+                ctx.fillStyle = '#ff0055';
+                ctx.fillText(`RAM: ${Math.floor(player.ram)}/${player.maxRam}`, 15, 70);
+            }
+        }
+
+        // Game Loop Thread
+        function gameLoop() {
+            update();
+            render();
+            requestAnimationFrame(gameLoop);
+        }
+
+        // --- Flow State Controllers ---
+        function startDialogue() {
+            gameState = 'DIALOGUE';
+            document.getElementById('dialogueOverlay').style.display = 'flex';
+            currentDialogueIdx = 0;
+            updateDialogueView();
+        }
+
+        function updateDialogueView() {
+            const d = storyDialogues[currentDialogueIdx];
+            document.getElementById('dialogueSpeaker').innerText = d.speaker;
+            document.getElementById('dialogueText').innerText = d.text;
+        }
+
+        function nextDialogueStep() {
+            currentDialogueIdx++;
+            if (currentDialogueIdx < storyDialogues.length) {
+                updateDialogueView();
+            } else {
+                document.getElementById('dialogueOverlay').style.display = 'none';
+                gameState = 'PLAYING';
+            }
+        }
+
+        document.getElementById('dialogueNextBtn').addEventListener('click', nextDialogueStep);
+        document.getElementById('dialogueOverlay').addEventListener('click', (e) => {
+            if (e.target.id === 'dialogueOverlay') nextDialogueStep();
+        });
+
+        document.getElementById('startBtn').addEventListener('click', () => {
+            audio.init();
+            document.getElementById('menuOverlay').style.display = 'none';
+            currentLevel = 1;
+            player.hp = 100;
+            player.eddies = 0;
+            generateMap();
+            startDialogue();
+        });
+
+        function triggerGameOver() {
+            gameState = 'GAMEOVER';
+            document.getElementById('menuTitle').innerText = 'СИСТЕМА ОТКЛЮЧЕНА';
+            document.getElementById('menuDesc').innerText = `ВЫ ПОГИБЛИ НА ЭТАЖЕ ${currentLevel}. НАКОПЛЕНО: €$ ${player.eddies}`;
+            document.getElementById('startBtn').innerText = 'ПЕРЕЗАПУСТИТЬ РЕЛИК';
+            document.getElementById('menuOverlay').style.display = 'flex';
+        }
+
+        // Kickstart Game Engine
+        generateMap();
+        gameLoop();
+    </script>
+</body>
+</html>
